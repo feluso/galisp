@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include "mpc.h"
 #define LASSERT(args, cond, err) \
-	if(!(cond)) { lval_del(args); return lval_err(errno);	}
+	if(!(cond)) { lval_del(args); return lval_err(err);	}
 
 /* Declare a buffer for user input of size 2048 */
 
@@ -296,9 +296,9 @@ lval* lval_take(lval* v, int i) {
  }
 
  lval* builtin_head(lval* qexpr) {
-	 LASSERT(qexpr, qexpr->count != 1 , "Function 'head' passed too many arguments");
-	 LASSERT(qexpr, qexpr->cell[0]->type != LVAL_QEXPR , "Function 'head' passed incorrect type!");
-	 LASSERT(qexpr, qexpr->cell[0]->count == 0 , "Function 'head' passed {}");
+	 LASSERT(qexpr, qexpr->count == 1 , "Function 'head' passed too many arguments");
+	 LASSERT(qexpr, qexpr->cell[0]->type == LVAL_QEXPR , "Function 'head' passed incorrect type!");
+	 LASSERT(qexpr, qexpr->cell[0]->count != 0 , "Function 'head' passed {}");
 
 	 //Take first argument
 	 lval* firstQexpr = lval_take(qexpr, 0);
@@ -311,9 +311,9 @@ lval* lval_take(lval* v, int i) {
 
 	 
  lval* builtin_tail(lval* qexpr) {
-	 LASSERT(qexpr, qexpr->count != 1 , "Function 'tail' passed too many arguments");
-	 LASSERT(qexpr, qexpr->cell[0]->type != LVAL_QEXPR , "Function 'tail' passed incorrect type!");
-	 LASSERT(qexpr, qexpr->cell[0]->count == 0 , "Function 'tail' passed {}");
+	 LASSERT(qexpr, qexpr->count == 1 , "Function 'tail' passed too many arguments");
+	 LASSERT(qexpr, qexpr->cell[0]->type == LVAL_QEXPR , "Function 'tail' passed incorrect type!");
+	 LASSERT(qexpr, qexpr->cell[0]->count != 0 , "Function 'tail' passed {}");
 	 //Take first argument
 	 lval* firstQexpr = lval_take(qexpr, 0);
 
