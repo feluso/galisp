@@ -1,7 +1,12 @@
 #include <stdio.h>
 #include "mpc.h"
-#define LASSERT(args, cond, err)				\
-  if(!(cond)) { lval_del(args); return lval_err(err);	}
+#define LASSERT(args, cond, fmt, ...) \
+  if (!(cond)) { \
+    lval* err = lval_err(fmt, ##__VA_ARGS__); \
+    lval_del(args); \
+    return err; \
+  }
+
 
 /* Declare a buffer for user input of size 2048 */
 
@@ -38,6 +43,19 @@ struct lenv {
 
 enum { LVAL_NUM, LVAL_ERR, LVAL_SYM, LVAL_FUN, LVAL_SEXPR, LVAL_QEXPR };
 
+char* ltype_name(int t) {
+  switch(t) {
+  case LVAL_FUN: return "Function";
+  case LVAL_NUM: return "Number";
+  case LVAL_ERR: return "Error";
+  case LVAL_SYM: return "Symbol";
+  case LVAL_SEXPR: return "S-expression";
+  case LVAL_QEXPR: return "Q-expression";
+  default: return "Unknown";
+  }
+}
+
+
 lval* lval_take(lval* v, int i); 
 lval* lval_pop(lval* v, int i);
 lval* lval_eval(lenv* e, lval* v);
@@ -45,6 +63,7 @@ lval* lval_read(mpc_ast_t* t);
 lval* lval_add(lval* v, lval* x);
 void lval_print(lval *v);
 void lval_expr_print(lval *v, char open, char close); 
+
 lval* lval_join(lval* x, lval* y);
 
 lval* lval_num(long x) {
@@ -54,11 +73,26 @@ lval* lval_num(long x) {
   return v;
 }
 
-lval* lval_err(char* m) {
+lval* lval_err(char* fmt, ...) {
   lval* v = malloc(sizeof(lval));
   v->type = LVAL_ERR;
-  v->err = malloc(strlen(m) + 1);
-  strcpy(v->err, m);
+
+  // Create a variable list
+  va_list va;
+  va_start(va, fmt);
+
+  // Allocate 512 bytes of memory
+  v->err = malloc(512);
+
+  // print the error string with a max of 511 characters
+  vsnprintf(v->err, 511, fmt, va);
+
+  // Reallocate to a number of bytes that are used
+  v->err = realloc(v->err, strlen(v->err)+1);
+
+  // Cleanup
+  va_end(va);
+
   return v;
 }
 
@@ -117,7 +151,7 @@ void lval_del(lval* v) {
 lval* lval_read_num(mpc_ast_t* t) {
   errno = 0;
   long x = strtol(t->contents, NULL, 10);
-  return errno != ERANGE ? lval_num(x) : lval_err("invalid number");
+  return errno != ERANGE ? lval_num(x) : lval_err("invalid number '%d'", x);
 }
 
 lval* lval_read(mpc_ast_t* t) {
@@ -232,7 +266,7 @@ lval* lenv_get(lenv* e, lval* k) {
   }
 
   /* If no symbol found return error */
-  return lval_err("unbound symbol!");
+  return lval_err("unbound symbol! '%s'", k->sym);
 }
 
 void lenv_put(lenv* e, lval* k, lval* v) {
@@ -363,8 +397,8 @@ lval* builtin_op(lenv* e, lval* a, char* op) {
 	 
 
 lval* builtin_head(lenv* e, lval* qexpr) {
-  LASSERT(qexpr, qexpr->count == 1 , "Function 'head' passed too many arguments");
-  LASSERT(qexpr, qexpr->cell[0]->type == LVAL_QEXPR , "Function 'head' passed incorrect type!");
+  LASSERT(qexpr, qexpr->count == 1 , "Function 'head' passed too many arguments. Got %i, Expected %i", qexpr->count, 1);
+  LASSERT(qexpr, qexpr->cell[0]->type == LVAL_QEXPR , "Function 'head' passed incorrect type!, Got %s, Expected %s.", ltype_name(qexpr->cell[0]->type), ltype_name(LVAL_QEXPR));
   LASSERT(qexpr, qexpr->cell[0]->count != 0 , "Function 'head' passed {}");
 
   //Take first argument
@@ -378,8 +412,8 @@ lval* builtin_head(lenv* e, lval* qexpr) {
 
 	 
 lval* builtin_tail(lenv* e, lval* qexpr) {
-  LASSERT(qexpr, qexpr->count == 1 , "Function 'tail' passed too many arguments");
-  LASSERT(qexpr, qexpr->cell[0]->type == LVAL_QEXPR , "Function 'tail' passed incorrect type!");
+  LASSERT(qexpr, qexpr->count == 1 , "Function 'tail' passed too many arguments Got %i, Expected %i", qexpr->count, 1);
+  LASSERT(qexpr, qexpr->cell[0]->type == LVAL_QEXPR , "Function 'tail' passed incorrect type! Got %s, Expected %s.", ltype_name(qexpr->cell[0]->type), ltype_name(LVAL_QEXPR));
   LASSERT(qexpr, qexpr->cell[0]->count != 0 , "Function 'tail' passed {}");
   //Take first argument
   lval* firstQexpr = lval_take(qexpr, 0);
@@ -396,8 +430,8 @@ lval* builtin_list(lenv* e, lval* a) {
 }
 
 lval* builtin_eval(lenv* e, lval* a) {
-  LASSERT(a, a->count == 1, "Function, 'eval' passed too many arguments!");
-  LASSERT(a, a->cell[0]->type == LVAL_QEXPR, "Function 'eval' passed incorrect type!");
+  LASSERT(a, a->count == 1, "Function, 'eval' passed too many arguments! Got %i, Expected %i", a->count, 1);
+  LASSERT(a, a->cell[0]->type == LVAL_QEXPR, "Function 'eval' passed incorrect type! Got %s, Expected %s.", ltype_name(a->cell[0]->type), ltype_name(LVAL_QEXPR));
 
   lval* x = lval_take(a, 0);
   x->type = LVAL_SEXPR;
@@ -407,7 +441,7 @@ lval* builtin_eval(lenv* e, lval* a) {
 lval* builtin_join(lenv* e, lval* a) {
 
   for (int i = 0; i < a->count; i++) {
-    LASSERT(a, a->cell[i]->type == LVAL_QEXPR, "Function 'join' passed incorrect type.");
+    LASSERT(a, a->cell[i]->type == LVAL_QEXPR, "Function 'join' passed incorrect type Got %s, Expected %s.", ltype_name(a->cell[0]->type), ltype_name(LVAL_QEXPR));
   }
 
   lval* x = lval_pop(a, 0);
@@ -443,6 +477,28 @@ void lenv_add_builtin(lenv* e, char* name, lbuiltin func) {
   lval_del(k); lval_del(v);
 }
 
+lval* builtin_def(lenv* env, lval* a) {
+  LASSERT(a, a->cell[0]->type == LVAL_QEXPR, "Function 'def' passed incorrect type! Got %s, Expected %s.", ltype_name(a->cell[0]->type), ltype_name(LVAL_QEXPR));
+
+  //First argument is the symbol list
+  lval* syms = a->cell[0];
+
+  //Ensure all elements of first list are symbols
+  for (int i = 0; i < syms->count; i++) {
+    LASSERT(a, syms->cell[i]->type == LVAL_SYM, "Function 'def' cannot define non symbols");
+  }
+
+
+  //Check correct number of symbols and values
+  LASSERT(a, syms->count == a->count-1, "Function 'def' contains incorrect number of values");
+
+  for (int i = 0; i < syms->count; i++) {
+    lenv_put(env, syms->cell[i], a->cell[i+1]);
+  }
+
+  lval_del(a);
+  return lval_sexpr();
+}
 
 void lenv_add_builtins(lenv* e) {
   lenv_add_builtin(e, "list", builtin_list);
@@ -454,6 +510,7 @@ void lenv_add_builtins(lenv* e) {
   lenv_add_builtin(e, "-", builtin_sub);
   lenv_add_builtin(e, "*", builtin_mul);
   lenv_add_builtin(e, "/", builtin_div);
+  lenv_add_builtin(e, "def", builtin_def);
 }
 
 int main(int argc, char** arv) {
