@@ -45,6 +45,7 @@ struct lval {
 };
 
 struct lenv {
+  lenv* parent;
   int count;
   char** syms;
   lval** vals;
@@ -286,6 +287,7 @@ lval* lval_copy(lval* v) {
 
 lenv* lenv_new(void) {
   lenv* e = malloc(sizeof(lenv));
+  e->parent = NULL;
   e->count = 0;
   e->syms = NULL;
   e->vals = NULL;
@@ -312,8 +314,27 @@ lval* lenv_get(lenv* e, lval* k) {
     }
   }
 
-  /* If no symbol found return error */
-  return lval_err("unbound symbol! '%s'", k->sym);
+  if(e->parent) {
+    return lenv_get(e->parent, k);
+  } else {
+    /* If no symbol found return error */
+    return lval_err("unbound symbol! '%s'", k->sym);
+  }
+}
+
+lval* lenv_copy(lenv* env) {
+  lenv* copy = malloc((sizeof(lenv)));
+  copy->parent = env->parent;
+  copy->count = env->count;
+  copy->syms = malloc(sizeof(char*) * env->count);
+  copy->vals = malloc(sizeof(lval*) * env->count);
+  for (int i = 0; i < env->count; i++) {
+    copy->syms[i] = malloc(strlen(env->syms[i]) + 1);
+    strcpy(env->syms[i], copy->syms[i]);
+    copy->vals[i] = lval_copy(env->vals[i]);
+  }
+  return env;
+  
 }
 
 void lenv_put(lenv* e, lval* k, lval* v) {
