@@ -502,10 +502,40 @@ lval* lval_call(lenv* env, lval* fun, lval* values) {
     lenv_put(fun->env, sym, value);
 
     lval_del(sym); lval_del(value);
-        
+
+    if(strcmp(sym->sym, "&") == 0) {
+
+      if(fun->formals->count != 1) {
+        lval_del(fun);
+        return lval_err("Function format invalid. Symbol '&' not followed by single symbol.");
+      }
+
+      lval* nsym = lval_pop(fun->formals, 0);
+      lenv_put(fun->env, nsym, builtin_list(env, nsym));
+      lval_del(sym); lval_del(nsym);
+      break;
+    }
+
+
   }
 
   lval_del(values);
+
+  if(fun->formals->count > 0 && strcmp(fun->formals->cell[0]->sym, "&") == 0) {
+
+    if(fun->formals->count != 2) {
+      lval_err("Funtion format invalid '&' not followed by single symbol.");
+    }
+
+    lval_del(lval_pop(fun->formals, 0));
+
+    lval* sym = lval_pop(fun->formals, 0);
+    lval* val = lval_qexpr();
+
+    lenv_put(fun->env, sym, val);
+    lval_del(sym); lval_del(val);
+
+  }
 
   if(fun->formals->count == 0) {
 
@@ -539,7 +569,7 @@ lval* lval_eval_sexpr(lenv* e, lval* v) {
     lval_del(v); lval_del(f);
     return lval_err("S-expression does not start with symbol!");
   }
-		 
+
   lval* result = lval_call(e, f, v);
   return result;
 }
@@ -551,7 +581,7 @@ lval* lval_eval(lenv* e,lval* v) {
     lval_del(v);
     return x;
   }
-  if(v->type == LVAL_SEXPR) { return lval_eval_sexpr(e, v); }	
+  if(v->type == LVAL_SEXPR) { return lval_eval_sexpr(e, v); }
   return v;
 }
 
