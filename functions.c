@@ -367,8 +367,9 @@ void lenv_put(lenv* e, lval* k, lval* v) {
 
 void lenv_def(lenv* env, lval* name, lval* value) {
   //Search a parent until we get to the parent environment
-  while(env->parent) {
+  if (env->parent) {
     lenv_def(env->parent, name, value);
+
   }
   
   lenv_put(env, name, value);
@@ -497,25 +498,25 @@ lval* lval_call(lenv* env, lval* fun, lval* values) {
     }
 
     lval* sym = lval_pop(fun->formals, 0);
+
+    if(strcmp(sym->sym, "&") == 0) {
+
+      if(fun->formals->count != 1) {
+        lval_del(values);
+        return lval_err("Function format invalid. Symbol '&' not followed by single symbol.");
+      }
+
+      lval* nsym = lval_pop(fun->formals, 0);
+      lenv_put(fun->env, nsym, builtin_list(env, values));
+      lval_del(sym); lval_del(nsym);
+      break;
+    }
+
     lval* value = lval_pop(values, 0);
 
     lenv_put(fun->env, sym, value);
 
     lval_del(sym); lval_del(value);
-
-    if(strcmp(sym->sym, "&") == 0) {
-
-      if(fun->formals->count != 1) {
-        lval_del(fun);
-        return lval_err("Function format invalid. Symbol '&' not followed by single symbol.");
-      }
-
-      lval* nsym = lval_pop(fun->formals, 0);
-      lenv_put(fun->env, nsym, builtin_list(env, nsym));
-      lval_del(sym); lval_del(nsym);
-      break;
-    }
-
 
   }
 
