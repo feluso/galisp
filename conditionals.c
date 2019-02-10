@@ -38,7 +38,6 @@ struct lval {
   lenv* env;
   lval* formals;
   lval* body;
-  
 
   // Expression
   int count;
@@ -678,50 +677,125 @@ lval* builtin_lambda(lenv* env, lval* val) {
   return lval_lambda(formals, body);
 }
 
-lval* builtin_comparator(lenv* env, lval* values, char* operator) {
-  LASSERT_NUM("<", values, 2);
-  LASSERT_TYPE("<", values, 0, LVAL_NUM);
-  LASSERT_TYPE("<", values, 1, LVAL_NUM);
+lval* builtin_ord(lenv* env, lval* values, char* operator) {
+  LASSERT_NUM(operator, values, 2);
+  LASSERT_TYPE(operator, values, 0, LVAL_NUM);
+  LASSERT_TYPE(operator, values, 1, LVAL_NUM);
 
   lval* first = lval_pop(values, 0);
   lval* second = lval_pop(values, 0);
   lval_del(values);
 
+  lval* result;
   if(strcmp("<", operator) == 0) {
-      return lval_num(first->num < second->num);
+      result = lval_num(first->num < second->num);
   } else if(strcmp(">", operator) == 0) {
-      return lval_num(first->num > second->num);
+      result = lval_num(first->num > second->num);
   } else if(strcmp(">=", operator) == 0) {
-      return lval_num(first->num >= second->num);
+      result =  lval_num(first->num >= second->num);
   } else if(strcmp("<=", operator) == 0) {
-      return lval_num(first->num <= second->num);
+      result = lval_num(first->num <= second->num);
   }
 
-  return lval_num(0);
-
+  lval_del(first); lval_del(second);
+  return result;
 }
 
 lval* builtin_lt(lenv* env, lval* values) {
-  return builtin_comparator(env, values, "<");
+  return builtin_ord(env, values, "<");
 
 }
 
 lval* builtin_gt(lenv* env, lval* values) {
-  return builtin_comparator(env, values, ">");
+  return builtin_ord(env, values, ">");
 
 }
 
 lval* builtin_gte(lenv* env, lval* values) {
-  return builtin_comparator(env, values, ">=");
+  return builtin_ord(env, values, ">=");
 
 }
 
 lval* builtin_lte(lenv* env, lval* values) {
-  return builtin_comparator(env, values, "<=");
+  return builtin_ord(env, values, "<=");
+}
 
+int lval_eq(lval* first, lval* second) {
+  if(first->type != second->type) { return 0; }
+  switch(first->type) {
+  case LVAL_NUM: return first->num == second->num; break;
+  case LVAL_SYM: return strcmp(first->sym, second->sym) == 0; break;
+  case LVAL_ERR: return strcmp(first->err, second->err) == 0; break;
+  case LVAL_FUN:
+    if(first->builtin || second->builtin) {
+      return first->builtin == second->builtin;
+    } else {
+      return lval_eq(first->formals, second->formals) && lval_eq(first->body, second->body);
+    }
+  case LVAL_QEXPR:
+  case LVAL_SEXPR:
+    if(first->count != second->count) { return 0; }
+    for(int i = 0; i < first->count; i++) {
+      if(lval_eq(first->cell[i], second->cell[i])) { return 0; }
+    }
+    return 1;
+    break;
+  }
+
+  return 0;
 }
 
 
+lval* builtin_compare(lenv* env, lval* values, char* operator) {
+  LASSERT_NUM(operator, values, 2);
+
+  lval* first = lval_pop(values, 0);
+  lval* second = lval_pop(values, 0);
+  lval_del(values);
+
+  lval* result;
+
+  if(strcmp("==", operator) == 0) {
+    result = lval_num(lval_eq(first, second));
+  } else if(strcmp("!=", operator) == 0) {
+    result = lval_num(!lval_eq(first, second));
+  }
+
+  lval_del(first); lval_del(second);
+  return result;
+}
+
+lval* builtin_eq(lenv* env, lval* values) {
+  return builtin_compare(env, values, "==");
+}
+
+lval* builtin_neq(lenv* env, lval* values) {
+  return builtin_compare(env, values, "!=");
+}
+
+lval* builtin_if(lenv* env, lval* values) {
+  LASSERT_NUM("if", values, 3);
+  LASSERT_TYPE("if", values, 0, LVAL_NUM);
+  LASSERT_TYPE("if", values, 1, LVAL_QEXPR);
+  LASSERT_TYPE("if", values, 2, LVAL_QEXPR);
+
+  int condition = values->cell[0]->num;
+  lval* ifStatement = values->cell[1];
+  lval* elseStatement = values->cell[2];
+
+  ifStatement->type = LVAL_SEXPR;
+  elseStatement->type = LVAL_SEXPR;
+
+  lval* result;
+  if(condition) {
+    result = lval_eval(env, lval_pop(values, 1));
+  } else {
+    result = lval_eval(env, lval_pop(values, 2));
+  }
+
+  lval_del(values);
+  return result;
+}
 
 void lenv_add_builtins(lenv* e) {
   lenv_add_builtin(e, "list", builtin_list);
@@ -740,6 +814,9 @@ void lenv_add_builtins(lenv* e) {
   lenv_add_builtin(e, ">", builtin_gt);
   lenv_add_builtin(e, "<=", builtin_lte);
   lenv_add_builtin(e, ">=", builtin_gte);
+  lenv_add_builtin(e, "==", builtin_eq);
+  lenv_add_builtin(e, "!=", builtin_neq);
+  lenv_add_builtin(e, "if", builtin_if);
 }
 
 
@@ -782,7 +859,7 @@ int main(int argc, char** arv) {
     /* Read a line of user input of maximum size 2048*/
     fgets(input, 2048, stdin);
 		
-		
+	
     /* Attempt to parse input */
     mpc_result_t r;
 		
