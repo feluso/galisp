@@ -196,6 +196,20 @@ lval* lval_read_num(mpc_ast_t* t) {
   return errno != ERANGE ? lval_num(x) : lval_err("invalid number '%d'", x);
 }
 
+lval* lval_read_string(mpc_ast_t* t) {
+  char* string = t->contents;
+  string[strlen(string)-1] = '\0';
+
+  char* unescaped = malloc(strlen(string+1)+1);
+  strcpy(unescaped, string+1);
+
+  unescaped = mpcf_unescape(unescaped);
+
+  lval* lval_string = lval_str(unescaped);
+  free(unescaped);
+  return lval_string;
+}
+
 lval* lval_read(mpc_ast_t* t) {
   if(strstr(t->tag, "number")) { return lval_read_num(t); }
   if(strstr(t->tag, "symbol")) { return lval_sym(t->contents); }
@@ -204,6 +218,7 @@ lval* lval_read(mpc_ast_t* t) {
   if(strcmp(t->tag, ">") == 0) { x= lval_sexpr(); }
   if(strstr(t->tag, "sexpr")) { x= lval_sexpr(); }
   if(strstr(t->tag, "qexpr")) { x= lval_qexpr(); }
+  if(strstr(t->tag, "string")) { x= lval_read_string(t); }
 	
   for (int i=0; i < t->children_num; i++) {
     if(strcmp(t->children[i]->contents, "(") == 0) { continue; }
@@ -237,6 +252,16 @@ void lval_expr_print(lval* v, char open, char close) {
   putchar(close);
 }
 
+void lval_print_str(lval* v) {
+  char* escaped = malloc(strlen(v->str) + 1);
+  strcpy(escaped, v->str);
+
+  escaped = mpcf_escape(escaped);
+
+  printf("\"%s\"", escaped);
+  free(escaped);
+}
+
 void lval_print(lval* v) {
   switch (v->type) {
   case LVAL_NUM: printf("%li", v->num); break;
@@ -256,15 +281,7 @@ void lval_print(lval* v) {
   }
 }
 
-void lval_print_str(lval* v) {
-  char* escaped = malloc(strlen(v->str) + 1);
-  strcpy(escaped, v->str);
 
-  escaped = mpcf_escaped(escaped);
-
-  printf("\"%s\"", escaped);
-  free(escaped);
-}
 
 void lval_println(lval* v) { lval_print(v); putchar('\n'); }
 
@@ -851,6 +868,7 @@ int main(int argc, char** arv) {
   /* Create some parses */ 
   mpc_parser_t* Number = mpc_new("number");
   mpc_parser_t* Symbol = mpc_new("symbol");
+  mpc_parser_t* String = mpc_new("string");
   mpc_parser_t* Sexpr = mpc_new("sexpr");
   mpc_parser_t* Qexpr = mpc_new("qexpr");
   mpc_parser_t* Expr = mpc_new("expr");
@@ -858,21 +876,22 @@ int main(int argc, char** arv) {
 	
   /* Define them with the following language */
   mpca_lang(MPCA_LANG_DEFAULT, 
-	    "																								\
-			number		: /-?[0-9]+/													; \
-			symbol		: /[a-zA-Z0-9_+\\-*\\/\\\\=<>!&]+/                                                                               ; \
-			sexpr		: '(' <expr>* ')'												; \
-			qexpr		: '{' <expr>* '}'												; \
-			expr		: <number> | <symbol> | <sexpr> | <qexpr> 						; \
-			galisp 		: /^/ <expr>* /$/												; \
+	    "																                	\
+			number		: /-?[0-9]+/													;\
+			symbol		: /[a-zA-Z0-9_+\\-*\\/\\\\=<>!&]+/                                                                              ;\
+                        string          : /\"(\\\\.|[^\"])*\"/ ;                                                                                         \
+                        sexpr		: '(' <expr>* ')'												; \
+			qexpr		: '{' <expr>* '}'												;\
+			expr		: <number> | <symbol> | <string> | <sexpr> | <qexpr> 						                        ; \
+			galisp 		: /^/ <expr>* /$/												;\
 		",
-	    Number, Symbol, Sexpr, Qexpr, Expr, Galisp);
+	    Number, Symbol, String, Sexpr, Qexpr, Expr, Galisp);
 	
 	
 	
 
   /* Print Version and Exit Information */
-  puts("GALISP version 0.0006");
+  puts("GALISP version 0.0007");
   puts("Press Ctrl+c to Exit \n");
 
   lenv* e = lenv_new();
@@ -909,6 +928,6 @@ int main(int argc, char** arv) {
 	 
 
 	
-  mpc_cleanup(6, Number, Symbol, Sexpr, Qexpr, Expr, Galisp);
+  mpc_cleanup(7, Number, Symbol, String, Sexpr, Qexpr, Expr, Galisp);
   return 0;
 }
