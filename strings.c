@@ -22,6 +22,16 @@ struct lenv;
 typedef struct lval lval;
 typedef struct lenv lenv;
 
+ /* Create some parses */ 
+mpc_parser_t* Number;
+mpc_parser_t* Symbol;
+mpc_parser_t* String;
+mpc_parser_t* Comment;
+mpc_parser_t* Sexpr;
+mpc_parser_t* Qexpr;
+mpc_parser_t* Expr ;
+mpc_parser_t* Galisp;
+
 
 typedef lval*(*lbuiltin)(lenv*, lval*);
 
@@ -226,6 +236,7 @@ lval* lval_read(mpc_ast_t* t) {
     if(strcmp(t->children[i]->contents, "{") == 0) { continue; }
     if(strcmp(t->children[i]->contents, "}") == 0) { continue; }
     if(strcmp(t->children[i]->tag, "regex") == 0) { continue; }
+    if(strstr(t->children[i]->tag, "comment")) { continue; }
     x = lval_add(x, lval_read(t->children[i]));
   }
 	
@@ -841,6 +852,35 @@ lval* builtin_if(lenv* env, lval* values) {
   return result;
 }
 
+lval* builtin_load(lenv* env, lval* filename) {
+  LASSERT_NUM("load", filename, 1);
+  LASSERT_TYPE("load", filename, 0, LVAL_STR);
+
+  mpc_result_t r;
+  if (mpc_parse_contents(filename->cell[0]->str, Galisp, &r)) {
+    lval* expr = lval_read(r.output);
+    mpc_ast_delete(r.output);
+
+    while(expr->count) {
+      lval* eval = lval_eval(env, lval_pop(expr, 0));
+      if(eval->type == LVAL_ERR) {
+	lval_println(eval);
+      }
+      lval_del(eval);
+    }
+    return lval_sexpr();
+  } else {
+    char* err_msg = mpc_err_string(r.error);
+    mpc_err_delete(r.error);
+    
+    lval* err = lval_err("Could not load library %s", err_msg);
+    free(err_msg);
+    lval_del(filename);
+    
+    return err;
+  }
+}
+
 void lenv_add_builtins(lenv* e) {
   lenv_add_builtin(e, "list", builtin_list);
   lenv_add_builtin(e, "head", builtin_head);
@@ -861,6 +901,7 @@ void lenv_add_builtins(lenv* e) {
   lenv_add_builtin(e, "==", builtin_eq);
   lenv_add_builtin(e, "!=", builtin_neq);
   lenv_add_builtin(e, "if", builtin_if);
+  lenv_add_builtin(e, "load", builtin_load);
 }
 
 
@@ -869,6 +910,7 @@ int main(int argc, char** arv) {
   mpc_parser_t* Number = mpc_new("number");
   mpc_parser_t* Symbol = mpc_new("symbol");
   mpc_parser_t* String = mpc_new("string");
+  mpc_parser_t* Comment = mpc_new("comment");
   mpc_parser_t* Sexpr = mpc_new("sexpr");
   mpc_parser_t* Qexpr = mpc_new("qexpr");
   mpc_parser_t* Expr = mpc_new("expr");
@@ -880,18 +922,19 @@ int main(int argc, char** arv) {
 			number		: /-?[0-9]+/													;\
 			symbol		: /[a-zA-Z0-9_+\\-*\\/\\\\=<>!&]+/                                                                              ;\
                         string          : /\"(\\\\.|[^\"])*\"/ ;                                                                                         \
+                        comment          : /;[^\\r\\n]*/ ;                                                                                         \
                         sexpr		: '(' <expr>* ')'												; \
 			qexpr		: '{' <expr>* '}'												;\
-			expr		: <number> | <symbol> | <string> | <sexpr> | <qexpr> 						                        ; \
+			expr		: <number> | <symbol> | <string> | <comment> | <sexpr> | <qexpr> 						                        ; \
 			galisp 		: /^/ <expr>* /$/												;\
 		",
-	    Number, Symbol, String, Sexpr, Qexpr, Expr, Galisp);
+	    Number, Symbol, String, Comment, Sexpr, Qexpr, Expr, Galisp);
 	
 	
 	
 
   /* Print Version and Exit Information */
-  puts("GALISP version 0.0007");
+  puts("GALISP version 0.0008");
   puts("Press Ctrl+c to Exit \n");
 
   lenv* e = lenv_new();
@@ -928,6 +971,6 @@ int main(int argc, char** arv) {
 	 
 
 	
-  mpc_cleanup(7, Number, Symbol, String, Sexpr, Qexpr, Expr, Galisp);
+  mpc_cleanup(8, Number, Symbol, String, Comment, Sexpr, Qexpr, Expr, Galisp);
   return 0;
 }
