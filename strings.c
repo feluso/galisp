@@ -868,6 +868,9 @@ lval* builtin_load(lenv* env, lval* filename) {
       }
       lval_del(eval);
     }
+
+    lval_del(expr);
+    lval_del(filename);
     return lval_sexpr();
   } else {
     char* err_msg = mpc_err_string(r.error);
@@ -879,6 +882,29 @@ lval* builtin_load(lenv* env, lval* filename) {
     
     return err;
   }
+}
+
+lval* builtin_print(lenv* env, lval* values) {
+
+  for(int i = 0; i < values->count; i++) {
+    lval_print(values->cell[i]);
+    putchar(' ');
+  }
+
+  putchar('\n');
+  lval_del(values);
+
+  return lval_sexpr();
+}
+
+lval* builtin_error(lenv* env, lval* values) {
+  LASSERT_NUM("error", values, 1);
+  LASSERT_TYPE("error", values, 0, LVAL_STR);
+
+  lval* err = lval_err(values->cell[0]->str);
+  lval_del(values);
+
+  return err;
 }
 
 void lenv_add_builtins(lenv* e) {
@@ -902,10 +928,12 @@ void lenv_add_builtins(lenv* e) {
   lenv_add_builtin(e, "!=", builtin_neq);
   lenv_add_builtin(e, "if", builtin_if);
   lenv_add_builtin(e, "load", builtin_load);
+  lenv_add_builtin(e, "print", builtin_print);
+  lenv_add_builtin(e, "error", builtin_error);
 }
 
 
-int main(int argc, char** arv) {
+int main(int argc, char** argv) {
   /* Create some parses */ 
   mpc_parser_t* Number = mpc_new("number");
   mpc_parser_t* Symbol = mpc_new("symbol");
@@ -929,16 +957,29 @@ int main(int argc, char** arv) {
 			galisp 		: /^/ <expr>* /$/												;\
 		",
 	    Number, Symbol, String, Comment, Sexpr, Qexpr, Expr, Galisp);
-	
-	
+
+  lenv* e = lenv_new();
+  lenv_add_builtins(e);
+  
+  if(argc >= 2) {
+    for(int i = 0; i < argc; i++) {
+
+      lval* args = lval_add(lval_sexpr(), lval_str(argv[i]));
+      lval* x = builtin_load(e, args);
+
+      if( x->type == LVAL_ERR) { lval_println(x); }
+
+      lval_del(x);
+    }
+    return 0;
+  }
 	
 
   /* Print Version and Exit Information */
   puts("GALISP version 0.0008");
   puts("Press Ctrl+c to Exit \n");
 
-  lenv* e = lenv_new();
-  lenv_add_builtins(e);
+
   
   /* In a never ending loop */
   while(1) {
