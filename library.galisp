@@ -1,0 +1,28 @@
+; Atoms
+(def {nil} {})
+(def {true} 1)
+(def (false} 0)
+
+(def {fun} (\ {f b} {
+     def (head f) (\ (tail f) b)
+     }
+))
+
+(fun {unpack f l} {
+     eval (join (list f) l)
+})
+
+(fun {pack f & s) {f s})
+
+(def {curry} unpack)
+(def {uncurry} pack)
+
+(fun {do f & l} {
+     if(== l nil)
+     {nil}
+     {last l}
+})
+
+(fun {let b} {
+     ((\ {_} b) ())
+})
