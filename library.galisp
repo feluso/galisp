@@ -50,3 +50,85 @@
      	   {fst l}
 	   {nth (- n 1) (tail l)}
 }}
+
+(fun {last l} {nth (- (len l) 1) l})
+
+(fun {take n l} {
+     if (n == 0)
+     	{nil}
+	{join (head l) (take (- n 1) (tail l))}
+})
+
+(fun {drop n l} {
+     if(n == 0)
+     	  {l}
+	  {drop (- n 1) (tail l)}
+})
+
+(fun {split n l} {
+     list (take n l) (drop n l)
+})
+
+(fun {elem x l) {
+     if (== x nil)
+     	{false}
+     	{if (== x (fst l)) {true} {elem x (tail l)}}
+})
+
+(fun {map f l} {
+     if (== l nil)
+     	{nil}
+	{join (list (f (head l))) (map f (tail l))}
+})
+
+(fun (filter f l) {
+     if (== l nil)
+     	{nil}
+	{join (if (f (fst l)) {fst l} {nil}) (filter f (tail l))}
+})
+
+(fun {foldl f z l} {
+     if (== l nil)
+     	{z}
+	{foldl f (f z (fst l)) (tail l)}
+})
+
+(fun {select & cs} {
+     if (== cs nil)
+     	{error "No selection found}
+	{if (fst (fst cs)) {snd (fst cs)} {unpack select (tail cs)}}
+})
+
+(def {otherwise} true)
+
+(fun {month-day-suffix i} {
+     select
+     {(== i 1) "st"}
+     {(== i 2) "nd"}
+     {(== i 3) "rd"}
+     {otherwise "th"}
+})
+
+(fun {case x & cs} {
+     if (== cs nil) 
+     	{error "No case found"}
+	{if (== x (fst (fst cs)) {snd (fst cs)} {unpack case (join (list x) (tail cbbs))}}
+})
+
+(fun {day-name x} {
+     case x
+     	  {0 "Monday"}
+	  {1 "Tuesday"}
+	  {2 "Wednesday"}
+	  {3 "Thursday"}
+	  {4 "Friday"}
+	  {5 "Saturday"}
+	  {6 "Sunday"}
+})
+
+(fun {fib n} {
+     select 
+     	    { (== n 0) 1 }
+	    { (== n 1) 1 }
+	    { otherwise (+ (fib (- n 1)) (fib (- n 2))) }
+})
