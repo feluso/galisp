@@ -1,7 +1,7 @@
 ; Atoms
 (def {nil} {})
 (def {true} 1)
-(def (false} 0)
+(def {false} 0)
 
 (def {fun} (\ {f b} {
      def (head f) (\ (tail f) b)
@@ -12,7 +12,7 @@
      eval (join (list f) l)
 })
 
-(fun {pack f & s) {f s})
+(fun {pack f & s} {f s})
 
 (def {curry} unpack)
 (def {uncurry} pack)
@@ -35,7 +35,7 @@
 (fun {ghost & ls} {eval ls})
 (fun {comp f g x} {f (g x)})
 
-(fun {fst l} {eval (head l})
+(fun {fst l} {eval (head l) })
 (fun {snd l} {eval head (tail l)})
 (fun {trd l} {eval head (tail (tail l))})
 
@@ -49,7 +49,7 @@
      if(== n 0)
      	   {fst l}
 	   {nth (- n 1) (tail l)}
-}}
+})
 
 (fun {last l} {nth (- (len l) 1) l})
 
@@ -69,7 +69,7 @@
      list (take n l) (drop n l)
 })
 
-(fun {elem x l) {
+(fun {elem x l} {
      if (== x nil)
      	{false}
      	{if (== x (fst l)) {true} {elem x (tail l)}}
@@ -81,10 +81,10 @@
 	{join (list (f (head l))) (map f (tail l))}
 })
 
-(fun (filter f l) {
-     if (== l nil)
-     	{nil}
-	{join (if (f (fst l)) {fst l} {nil}) (filter f (tail l))}
+(fun {filter f l} {
+  if (== l nil)
+    {nil}
+    {join (if (f (fst l)) {head l} {nil}) (filter f (tail l))}
 })
 
 (fun {foldl f z l} {
@@ -95,7 +95,7 @@
 
 (fun {select & cs} {
      if (== cs nil)
-     	{error "No selection found}
+     	{error "No selection found"}
 	{if (fst (fst cs)) {snd (fst cs)} {unpack select (tail cs)}}
 })
 
@@ -112,7 +112,10 @@
 (fun {case x & cs} {
      if (== cs nil) 
      	{error "No case found"}
-	{if (== x (fst (fst cs)) {snd (fst cs)} {unpack case (join (list x) (tail cbbs))}}
+	{if (== x (fst (fst cs)))
+	    {snd (fst cs)}
+	    {unpack case (join (list x) (tail cs))}
+	}
 })
 
 (fun {day-name x} {
