@@ -36,8 +36,8 @@
 (fun {comp f g x} {f (g x)})
 
 (fun {fst l} {eval (head l) })
-(fun {snd l} {eval head (tail l)})
-(fun {trd l} {eval head (tail (tail l))})
+(fun {snd l} {eval (head (tail l))})
+(fun {trd l} {eval (head (tail (tail l)))})
 
 (fun {len l} {
      if (== 1 nil)
@@ -78,7 +78,7 @@
 (fun {map f l} {
      if (== l nil)
      	{nil}
-	{join (list (f (head l))) (map f (tail l))}
+	{join (list (f (fst l))) (map f (tail l))}
 })
 
 (fun {filter f l} {
